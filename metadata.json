@@ -1,0 +1,8 @@
+{
+  "name": "Remix KÝ • 記憶島 - Cozy Island Journal",
+  "description": "Bản đồ thế giới ký ức và nhật ký hành trình khám phá 47 tỉnh thành Nhật Bản \u0026 Việt Nam.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
