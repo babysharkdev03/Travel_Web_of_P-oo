@@ -1,246 +1,115 @@
-import React, { useState } from 'react';
-import { CountryId, Language, Memory, ScreenType } from '../types';
-import { getT } from '../utils/translations';
+import React from 'react';
+import { CountryId, Language, Memory, ProfileData } from '../types';
 import { WorldMapCanvas } from './WorldMapCanvas';
-import { BookOpen, Sparkles, Compass, ArrowRight } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, MapPin } from 'lucide-react';
+import travelerAvatar from '../assets/traveler-avatar.png';
+import { memoryLocationLabel } from '../utils/memoryLocations';
 
 interface WorldMapScreenProps {
   selectedCountry: CountryId;
   onSelectCountry: (country: CountryId) => void;
   onNavigateToRegionMap: (country: CountryId) => void;
+  onNavigateToMemories: () => void;
   onSelectMemory: (memory: Memory) => void;
   memories: Memory[];
+  profile: ProfileData;
   lang: Language;
 }
 
 export const WorldMapScreen: React.FC<WorldMapScreenProps> = ({
-  selectedCountry,
-  onSelectCountry,
-  onNavigateToRegionMap,
-  onSelectMemory,
-  memories,
-  lang,
+  selectedCountry, onSelectCountry, onNavigateToRegionMap, onNavigateToMemories,
+  onSelectMemory, memories, profile, lang,
 }) => {
-  const t = getT(lang);
-
-  // Latest memory article (Bài viết gần nhất tác giả đăng)
-  const latestMemory = memories.length > 0 ? memories[0] : null;
+  const counts = {
+    JP: memories.filter((memory) => memory.countryId === 'JP').length,
+    VN: memories.filter((memory) => memory.countryId === 'VN').length,
+  };
+  const countryMemories = memories
+    .filter((memory) => memory.countryId === selectedCountry)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const recent = [...memories].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  const countryName = selectedCountry === 'JP'
+    ? (lang === 'VI' ? 'Nhật Bản' : '日本')
+    : (lang === 'VI' ? 'Việt Nam' : 'ベトナム');
+  const countryThought = selectedCountry === 'JP'
+    ? (lang === 'VI' ? 'Những con phố và mùa hoa luôn khiến mình muốn đi chậm lại để ghi nhớ từng khoảnh khắc.' : '街並みと季節の花に出会うたび、一瞬一瞬を大切に残したくなります。')
+    : (lang === 'VI' ? 'Mỗi lần trở về, mình lại tìm thấy một góc thân quen và một câu chuyện mới.' : '帰るたびに、懐かしい景色の中で新しい物語を見つけます。');
 
   return (
-    <div className="flex flex-col w-full pb-28 pt-2">
-      {/* 1. Explorer Passport Folio Card (Top HUD Widget) */}
-      <div className="px-4 pb-3">
-        <div className="p-4 rounded-2xl bg-white shadow-[0_4px_16px_rgba(88,71,56,0.06)] border border-[#ddc0ba]/40">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-[#ffdad2] flex items-center justify-center flex-shrink-0 text-[#9e3c26]">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <h2 className="font-bold text-[18px] text-[#1c1c17] truncate leading-tight font-display">
-                  {t.passportTitle}
-                </h2>
-                <p className="text-[12px] text-[#57423d] truncate font-body">
-                  {t.passportSubtitle}
-                </p>
-              </div>
-            </div>
-            <span className="px-2.5 py-1 rounded-full bg-[#f7f3eb] text-[#9e3c26] text-[11px] font-bold flex-shrink-0 font-display border border-[#ddc0ba]/30">
-              {t.countriesCount}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Interactive 2D World Fantasy Map Canvas */}
-      <div className="px-4">
-        <WorldMapCanvas
-          selectedCountry={selectedCountry}
-          onSelectCountry={onSelectCountry}
-          lang={lang}
+    <div className="flex flex-col gap-3 px-4 pt-3 pb-28">
+      <section className="p-4 rounded-2xl bg-white border border-[#ddc0ba]/40 shadow-sm flex items-center gap-3">
+        <img
+          src={profile.avatarUrl || travelerAvatar}
+          onError={(event) => { if (!event.currentTarget.src.endsWith(travelerAvatar)) event.currentTarget.src = travelerAvatar; }}
+          alt={lang === 'VI' ? 'Ảnh tác giả' : '著者の写真'}
+          className="w-14 h-14 rounded-full object-cover border-2 border-[#ffdad2] flex-shrink-0"
         />
-      </div>
-
-      {/* 3. Dynamic Active Country Drawer Card */}
-      <div className="px-4 pt-3 pb-3">
-        <div className="flex items-center gap-1.5 text-[11px] text-[#8a726c] font-display px-1 mb-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#9e3c26] animate-pulse" />
-          <span>
-            {lang === 'VI'
-              ? 'Chạm vào biểu tượng cờ nhấp nháy trên bản đồ để đổi giữa Nhật Bản và Việt Nam'
-              : '地図上で点滅する国旗アイコンをタップして国を切り替え'}
-          </span>
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wider text-[#8a726c] font-bold">{lang === 'VI' ? 'Tác giả' : '著者'}</p>
+          <h1 className="text-[17px] leading-snug font-bold text-[#1c1c17] font-display">
+            {lang === 'VI' ? profile.authorName : (profile.authorNameJa || profile.authorName)}
+          </h1>
+          <p className="text-[12px] text-[#9e3c26] font-semibold">
+            {memories.length} {lang === 'VI' ? 'ký ức đã viết' : '件の旅の記憶'}
+          </p>
         </div>
-        {selectedCountry === 'JP' ? (
-          /* JAPAN CARD */
-          <div className="p-4 rounded-2xl bg-white shadow-[0_4px_16px_rgba(88,71,56,0.06)] relative overflow-hidden border border-[#ddc0ba]/40 transition-all">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-full bg-white border border-[#ddc0ba]/50 flex items-center justify-center shadow-xs flex-shrink-0 relative overflow-hidden">
-                <div className="w-5 h-5 rounded-full bg-[#bc002d] shadow-inner" />
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-[18px] text-[#1c1c17] truncate font-display">
-                    {t.japan}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-[#1d6774]/10 text-[#1d6774] text-[11px] font-bold font-display">
-                    JP
-                  </span>
-                </div>
-                <p className="text-[12px] text-[#57423d] truncate font-body">
-                  {t.japanMemoriesCount}
-                </p>
-              </div>
-            </div>
+      </section>
 
-            <div className="mt-2.5 p-2 rounded-xl bg-[#f7f3eb] flex items-center justify-between gap-2 border border-[#ddc0ba]/30">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Sparkles className="w-4 h-4 text-[#1d6774] flex-shrink-0" />
-                <p className="text-[12px] text-[#57423d] truncate font-body">
-                  {t.latestMemoryJp}
-                </p>
-              </div>
-              <span className="text-[11px] text-[#1d6774] flex-shrink-0 font-bold font-display whitespace-nowrap">
-                {t.timeAgo2Days}
-              </span>
-            </div>
+      <p className="px-1 text-[12px] leading-relaxed text-[#57423d] font-body">
+        {lang === 'VI' ? profile.quoteVi : profile.quoteJa}
+      </p>
 
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => onNavigateToRegionMap('JP')}
-                className="w-full h-11 px-6 rounded-full bg-[#9e3c26] text-white font-bold text-[14px] shadow-md hover:bg-[#822714] active:translate-y-0.5 transition-all flex items-center justify-center gap-2 font-display cursor-pointer"
-              >
-                <Compass className="w-4 h-4" />
-                <span>{t.journeyFootsteps}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* VIETNAM CARD */
-          <div className="p-4 rounded-2xl bg-white shadow-[0_4px_16px_rgba(88,71,56,0.06)] relative overflow-hidden border border-[#ddc0ba]/40 transition-all">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-full bg-[#da251d] flex items-center justify-center shadow-xs flex-shrink-0 relative overflow-hidden border border-[#da251d]">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-[#ff0]">
-                  <path d="M12 2.5l2.8 6.4 6.9.6-5.2 4.6 1.6 6.8L12 17.2 5.9 20.9l1.6-6.8L2.3 9.5l6.9-.6z" />
-                </svg>
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-[18px] text-[#1c1c17] truncate font-display">
-                    {t.vietnam}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-[#9e3c26]/10 text-[#9e3c26] text-[11px] font-bold font-display">
-                    VN
-                  </span>
-                </div>
-                <p className="text-[12px] text-[#57423d] truncate font-body">
-                  {t.vietnamMemoriesCount}
-                </p>
-              </div>
-            </div>
+      <WorldMapCanvas selectedCountry={selectedCountry} onSelectCountry={onSelectCountry} counts={counts} lang={lang} />
 
-            <div className="mt-2.5 p-2 rounded-xl bg-[#f7f3eb] flex items-center justify-between gap-2 border border-[#ddc0ba]/30">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Sparkles className="w-4 h-4 text-[#9e3c26] flex-shrink-0" />
-                <p className="text-[12px] text-[#57423d] truncate font-body">
-                  {t.latestMemoryVn}
-                </p>
-              </div>
-              <span className="text-[11px] text-[#9e3c26] flex-shrink-0 font-bold font-display whitespace-nowrap">
-                {t.timeAgo5Days}
-              </span>
-            </div>
-
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => onNavigateToRegionMap('VN')}
-                className="w-full h-11 px-6 rounded-full bg-[#9e3c26] text-white font-bold text-[14px] shadow-md hover:bg-[#822714] active:translate-y-0.5 transition-all flex items-center justify-center gap-2 font-display cursor-pointer"
-              >
-                <Compass className="w-4 h-4" />
-                <span>{t.journeyFootsteps}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. KÝ ỨC VỪA GHI DẤU (Bài viết gần nhất vừa đăng) */}
-      {latestMemory && (
-        <div className="px-4 pb-6">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#9e3c26]" />
-              <span className="font-bold text-[17px] text-[#1c1c17] font-display">
-                {lang === 'VI' ? 'Ký Ức Vừa Ghi Dấu' : '最近の記憶'}
-              </span>
-            </div>
-            <span className="text-[11px] font-mono text-[#8a726c]">
-              {latestMemory.date}
-            </span>
-          </div>
-
-          <div
-            onClick={() => onSelectMemory(latestMemory)}
-            className="group cursor-pointer rounded-3xl bg-white shadow-[0_4px_20px_rgba(88,71,56,0.08)] border border-[#ddc0ba]/40 overflow-hidden hover:border-[#9e3c26]/50 hover:shadow-lg transition-all active:scale-[0.99]"
-          >
-            {/* Featured Cover Image */}
-            <div className="relative w-full h-48 bg-[#ece8e0] overflow-hidden">
-              <img
-                src={latestMemory.image}
-                alt={latestMemory.imageAlt || latestMemory.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
-
-              {/* Tag & Icon Pill */}
-              <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-[11px] font-bold font-display text-[#1c1c17] shadow-xs flex items-center gap-1">
-                  <span>{latestMemory.icon || '🌸'}</span>
-                  <span>{latestMemory.tag}</span>
-                </span>
-              </div>
-
-              {/* Date Badge */}
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                <span className="text-[12px] font-medium font-body bg-black/40 backdrop-blur-xs px-2.5 py-0.5 rounded-full">
-                  📍 {latestMemory.locationName}
-                </span>
-                <span className="text-[11px] font-bold font-display bg-[#9e3c26] px-2.5 py-0.5 rounded-full shadow-xs">
-                  {lang === 'VI' ? 'Bài viết mới nhất' : '最新記事'}
-                </span>
-              </div>
-            </div>
-
-            {/* Content Details */}
-            <div className="p-4">
-              <h3 className="font-bold text-[16px] text-[#1c1c17] font-display group-hover:text-[#9e3c26] transition-colors line-clamp-1 mb-1.5">
-                {lang === 'VI' ? latestMemory.title : latestMemory.titleJa}
-              </h3>
-
-              <p className="text-[13px] text-[#57423d] font-body line-clamp-2 leading-relaxed mb-3">
-                {lang === 'VI' ? latestMemory.notes : latestMemory.notesJa}
-              </p>
-
-              <div className="pt-2.5 border-t border-[#ddc0ba]/30 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[11px] text-[#8a726c] font-body">
-                  <span>{latestMemory.daysAgoText}</span>
-                  <span>•</span>
-                  <span>{latestMemory.soundtrack}</span>
-                </div>
-                <span className="text-[12px] text-[#9e3c26] font-bold font-display flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                  <span>{lang === 'VI' ? 'Đọc bài viết' : '記事を読む'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </div>
-          </div>
+      <section className="p-4 rounded-2xl bg-white border border-[#ddc0ba]/40 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <MapPin className="w-4 h-4 text-[#9e3c26]" />
+          <h2 className="font-bold text-[17px] text-[#1c1c17] font-display">{countryName}</h2>
+          <span className="ml-auto text-[11px] font-bold text-[#9e3c26]">{counts[selectedCountry]} {lang === 'VI' ? 'ký ức' : '件の記憶'}</span>
         </div>
-      )}
+        <p className="text-[12px] leading-relaxed text-[#57423d] italic">“{countryThought}”</p>
+        <p className="text-[12px] text-[#57423d] mt-2">
+          {lang === 'VI' ? 'Ký ức gần nhất:' : '最新の記憶:'}{' '}
+          <strong>{countryMemories[0] ? (lang === 'VI' ? countryMemories[0].title : countryMemories[0].titleJa) : (lang === 'VI' ? 'Chưa có' : 'まだありません')}</strong>
+        </p>
+        <button
+          type="button"
+          onClick={() => onNavigateToRegionMap(selectedCountry)}
+          className="mt-3 w-full min-h-10 rounded-full bg-[#9e3c26] text-white font-bold text-[13px] flex items-center justify-center gap-2 hover:bg-[#822714] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9e3c26]"
+        >
+          <Compass className="w-4 h-4" />
+          {lang === 'VI' ? 'Khám phá bản đồ quốc gia' : '国の地図を見る'}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </section>
+
+      <section aria-labelledby="recent-memories-heading">
+        <div className="flex items-center justify-between px-1 mb-2">
+          <h2 id="recent-memories-heading" className="font-bold text-[17px] text-[#1c1c17] font-display">
+            {lang === 'VI' ? 'Ký ức vừa ghi dấu' : '最近の記憶'}
+          </h2>
+          <button type="button" onClick={onNavigateToMemories} className="text-[12px] font-bold text-[#9e3c26] underline underline-offset-2">
+            {lang === 'VI' ? 'Xem tất cả' : 'すべて見る'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {recent.map((memory) => (
+            <button
+              key={memory.id}
+              type="button"
+              onClick={() => onSelectMemory(memory)}
+              className="w-full text-left p-3 rounded-2xl bg-white border border-[#ddc0ba]/40 flex items-center gap-3 hover:border-[#9e3c26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9e3c26]"
+            >
+              <span className="w-10 h-10 rounded-xl bg-[#ffdad2]/60 flex items-center justify-center text-xl flex-shrink-0" aria-hidden="true">{memory.icon || '📖'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-[#1c1c17] truncate">{lang === 'VI' ? memory.title : memory.titleJa}</span>
+                <span className="block text-[11px] text-[#57423d] truncate">{memoryLocationLabel(memory, lang)} · {memory.date}</span>
+              </span>
+              <BookOpen className="w-4 h-4 text-[#9e3c26] flex-shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

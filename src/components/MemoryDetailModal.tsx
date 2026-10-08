@@ -1,5 +1,5 @@
 import React from 'react';
-import { Memory, Language } from '../types';
+import { Memory, Language, ProfileData } from '../types';
 import { getT } from '../utils/translations';
 import {
   ArrowLeft,
@@ -14,12 +14,14 @@ import {
   Check
 } from 'lucide-react';
 import { RichTextRenderer } from './RichTextRenderer';
+import { memoryLocationLabel } from '../utils/memoryLocations';
 
 interface MemoryDetailModalProps {
   memory: Memory | null;
   onClose: () => void;
   onToggleFavorite: (id: string) => void;
   lang: Language;
+  profile: ProfileData;
 }
 
 export const MemoryDetailModal: React.FC<MemoryDetailModalProps> = ({
@@ -27,6 +29,7 @@ export const MemoryDetailModal: React.FC<MemoryDetailModalProps> = ({
   onClose,
   onToggleFavorite,
   lang,
+  profile,
 }) => {
   const [copied, setCopied] = React.useState(false);
   if (!memory) return null;
@@ -137,7 +140,7 @@ export const MemoryDetailModal: React.FC<MemoryDetailModalProps> = ({
               {memory.countryId === 'JP' ? '🇯🇵 Nhật Bản' : '🇻🇳 Việt Nam'}
             </span>
             <span className="hidden sm:inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-md">
-              {memory.locationName}
+              {memoryLocationLabel(memory, lang)}
             </span>
           </div>
         </div>
@@ -166,7 +169,7 @@ export const MemoryDetailModal: React.FC<MemoryDetailModalProps> = ({
         <div className="flex flex-wrap items-center gap-2 pb-2 text-[12.5px] text-[#57423d]">
           <span className="px-3.5 py-1.5 rounded-2xl bg-white border border-[#ddc0ba]/50 shadow-2xs font-semibold flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-[#9e3c26]" />
-            <span>{memory.specificSpot || memory.locationName}</span>
+            <span>{lang === 'VI' ? (memory.specificSpot || memory.locationName) : memoryLocationLabel(memory, lang)}</span>
           </span>
 
           <span className="px-3.5 py-1.5 rounded-2xl bg-white border border-[#ddc0ba]/50 shadow-2xs font-semibold flex items-center gap-1.5">
@@ -222,7 +225,7 @@ export const MemoryDetailModal: React.FC<MemoryDetailModalProps> = ({
           <div className="flex items-center gap-2 text-[12px] text-[#8a726c]">
             <span>🌸 KÝ • 記憶島</span>
             <span>•</span>
-            <span>{lang === 'VI' ? 'Dấu chân hành trình của Thu Pham' : 'Pham Thu の旅の記録'}</span>
+            <span>{lang === 'VI' ? `Dấu chân hành trình của ${profile.authorName}` : `${profile.authorNameJa || profile.authorName} の旅の記録`}</span>
           </div>
 
           <button

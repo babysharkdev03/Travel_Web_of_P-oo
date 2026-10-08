@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { CountryId, Language, Memory, Prefecture, Region } from '../types';
+import { CountryId, Language, Memory, Prefecture, ProfileData, Region } from '../types';
 import { getT } from '../utils/translations';
 import { JapanInteractiveMap } from './JapanInteractiveMap';
 import { VietnamInteractiveMap } from './VietnamInteractiveMap';
+import { memoriesAtProvince, memoryProvinceId, provinceNames } from '../utils/memoryLocations';
 import {
   japanRegions,
   allJapanPrefectures,
@@ -28,16 +29,17 @@ interface JapanMapScreenProps {
   onChangeCountry: (c: CountryId) => void;
   onOpenNewMemory: () => void;
   onSelectMemory: (m: Memory) => void;
-  onNavigateToMemories?: (provinceOrCity: string) => void;
+  onNavigateToMemories?: (country: CountryId, provinceId: string) => void;
   memories: Memory[];
   prefectures: Prefecture[];
-  onUpdatePrefectureStatus: (id: string, status: 'visited' | 'wishlist' | 'unvisited') => void;
+  onUpdatePrefectureStatus: (id: string, status: 'visited' | 'dream' | 'not_visited') => void;
   vietnamRegions: Region[];
   vietnamProvinces?: Prefecture[];
-  onUpdateVietnamProvinceStatus?: (id: string, status: 'visited' | 'wishlist' | 'unvisited') => void;
+  onUpdateVietnamProvinceStatus?: (id: string, status: 'visited' | 'dream' | 'not_visited') => void;
   isAdmin: boolean;
   onOpenAdmin: () => void;
   lang: Language;
+  profile: ProfileData;
 }
 
 const normalizeSearch = (str: string) => {
@@ -127,12 +129,14 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
   isAdmin,
   onOpenAdmin,
   lang,
+  profile,
 }) => {
   const t = getT(lang);
   const [activeTab, setActiveTab] = useState<'map' | 'detail'>('map');
-  const [filterMode, setFilterMode] = useState<'all' | 'visited' | 'wishlist'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'visited' | 'dream'>('all');
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(japanRegions[2]); // Default Kanto
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [expandedRegions, setExpandedRegions] = useState<Record<string, boolean>>({
     // Japan 8 regions
     hokkaido: true,
@@ -154,12 +158,24 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
   const [shareCopied, setShareCopied] = useState(false);
 
   const provincesToUse = country === 'JP' ? prefectures : (vietnamProvinces || allVietnamProvinces);
-  const regionsToUse = country === 'JP' ? japanRegions : vietnamRegions;
+  const regionsToUse = (country === 'JP' ? japanRegions : vietnamRegions).map((region) => {
+    const provinceList = provincesToUse.filter((province) => province.regionId === region.id);
+    return {
+      ...region,
+      visitedPrefectures: provinceList.filter((province) => province.status === 'visited').length,
+      wishlistCount: provinceList.filter((province) => province.status === 'dream').length,
+      memoryCount: memories.filter((memory) => memory.countryId === country && (
+        provinceList.some((province) => province.id === memoryProvinceId(memory)) ||
+        (!memoryProvinceId(memory) && memory.regionId === region.id)
+      )).length,
+      status: provinceList.some((province) => province.status === 'visited') ? 'visited' as const
+        : provinceList.some((province) => province.status === 'dream') ? 'dream' as const : 'not_visited' as const,
+    };
+  });
 
   // Active region safely guarded against country mismatch
-  const currentRegion = (selectedRegion && selectedRegion.countryId === country)
-    ? selectedRegion
-    : (country === 'JP' ? japanRegions[2] : (vietnamRegions[0] || regionsToUse[0]));
+  const currentRegion = regionsToUse.find((region) => region.id === selectedRegion?.id)
+    || (country === 'JP' ? regionsToUse[2] : regionsToUse[0]);
 
   // Keep selectedRegion synced with current country
   React.useEffect(() => {
@@ -175,16 +191,16 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
   }, [country, vietnamRegions, selectedRegion]);
 
   // Toggle prefecture status (admin only)
-  const handleTogglePrefectureStatus = (id: string, e: React.MouseEvent) => {
+  const handleTogglePrefectureStatus = (id: string, e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     if (!isAdmin) return;
     const currentPref = provincesToUse.find((p) => p.id === id);
     if (!currentPref) return;
     const nextStatus =
       currentPref.status === 'visited'
-        ? 'wishlist'
-        : currentPref.status === 'wishlist'
-        ? 'unvisited'
+        ? 'dream'
+        : currentPref.status === 'dream'
+        ? 'not_visited'
         : 'visited';
 
     if (country === 'JP') {
@@ -196,7 +212,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
 
   const handleSetPrefectureStatus = (
     id: string,
-    status: 'visited' | 'wishlist' | 'unvisited',
+    status: 'visited' | 'dream' | 'not_visited',
     e: React.MouseEvent
   ) => {
     e.stopPropagation();
@@ -215,6 +231,20 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
     }));
   };
 
+  const scrollToProvince = (provinceId: string) => {
+    setSelectedProvinceId(provinceId);
+    const province = provincesToUse.find((item) => item.id === provinceId);
+    const region = regionsToUse.find((item) => item.id === province?.regionId);
+    if (region) setSelectedRegion(region);
+    window.setTimeout(() => document.getElementById(`province-${provinceId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+  };
+
+  const selectRegion = (region: Region) => {
+    setSelectedRegion(region);
+    setSelectedProvinceId(null);
+    window.setTimeout(() => document.getElementById('region-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+
   const handleShare = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
@@ -225,7 +255,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
 
   // Stats calculation
   const totalVisited = provincesToUse.filter((p) => p.status === 'visited').length;
-  const totalWishlist = provincesToUse.filter((p) => p.status === 'wishlist').length;
+  const totalWishlist = provincesToUse.filter((p) => p.status === 'dream').length;
   const totalMemoriesCount = country === 'JP'
     ? memories.filter((m) => m.countryId === 'JP').length
     : memories.filter((m) => m.countryId === 'VN').length;
@@ -246,6 +276,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
       const matchName = p.name.toLowerCase().includes(q) || nameNorm.includes(qNorm);
       const matchJa = p.nameJa.toLowerCase().includes(q);
       const matchCapital = p.capital ? (p.capital.toLowerCase().includes(q) || capNorm.includes(qNorm)) : false;
+      const matchAlias = provinceNames(p).some((name) => normalizeSearch(name).includes(qNorm));
 
       // Hiragana / Katakana bidirectional match
       const qHira = kataToHira(q);
@@ -275,13 +306,13 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
         );
       });
 
-      if (!matchName && !matchJa && !matchCapital && !matchHiraKata && !matchKanaDict && !isHcm && !matchRegion) {
+      if (!matchName && !matchJa && !matchCapital && !matchAlias && !matchHiraKata && !matchKanaDict && !isHcm && !matchRegion) {
         return false;
       }
     }
 
     if (filterMode === 'visited') return p.status === 'visited';
-    if (filterMode === 'wishlist') return p.status === 'wishlist';
+    if (filterMode === 'dream') return p.status === 'dream';
     return true;
   });
 
@@ -408,9 +439,9 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setFilterMode('wishlist')}
+            onClick={() => setFilterMode('dream')}
             className={`px-4 py-1.5 rounded-full text-[12px] font-display transition-all ${
-              filterMode === 'wishlist'
+              filterMode === 'dream'
                 ? 'bg-[#9e3c26] text-white font-bold shadow-xs'
                 : 'bg-white text-[#57423d] border border-[#ddc0ba]/40 hover:bg-[#f7f3eb]'
             }`}
@@ -423,6 +454,24 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
       {/* 5. TAB 1: [BẢN ĐỒ] (Map View) */}
       {activeTab === 'map' && (
         <>
+          <div className="px-4 pb-3">
+            <label className="block text-[12px] font-bold text-[#57423d] mb-1" htmlFor="map-province-search">
+              {lang === 'VI' ? 'Tìm tỉnh / thành phố' : '都道府県・省市を検索'}
+            </label>
+            <input
+              id="map-province-search"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={country === 'JP' ? 'Tokyo / 東京' : 'Hà Nội / ハノイ'}
+              className="w-full h-10 px-3 rounded-xl bg-white border border-[#ddc0ba]/50 text-[13px] text-[#1c1c17]"
+            />
+            {searchQuery && <div className="flex gap-1.5 overflow-x-auto mt-2 pb-1">{filteredPrefectures.map((province) => (
+              <button key={province.id} type="button" onClick={() => scrollToProvince(province.id)} className="px-3 py-1.5 rounded-full bg-white border border-[#ddc0ba]/50 text-[12px] text-[#9e3c26] whitespace-nowrap">
+                {lang === 'VI' ? province.name : province.nameJa}
+              </button>
+            ))}</div>}
+          </div>
           <div className="px-4 pb-3">
             <div className="p-3.5 rounded-2xl bg-white shadow-sm border border-[#ddc0ba]/40">
               {/* Header inside card */}
@@ -441,23 +490,37 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
               </div>
 
               {/* Map Canvas */}
+              <div className="relative">
               {country === 'JP' ? (
                 <JapanInteractiveMap
-                  regions={japanRegions}
+                  regions={regionsToUse}
                   selectedRegion={currentRegion}
-                  onSelectRegion={setSelectedRegion}
+                  onSelectRegion={selectRegion}
                   filterMode={filterMode}
                   lang={lang}
                 />
               ) : (
                 <VietnamInteractiveMap
-                  regions={vietnamRegions}
+                  regions={regionsToUse}
                   selectedRegion={currentRegion}
-                  onSelectRegion={setSelectedRegion}
+                  onSelectRegion={selectRegion}
                   filterMode={filterMode}
                   lang={lang}
                 />
               )}
+              <div className="absolute bottom-3 left-3 right-14 z-30 flex gap-1 overflow-x-auto no-scrollbar pb-1" aria-label={lang === 'VI' ? 'Tỉnh thành trên bản đồ' : '地図上の地域'}>
+                {provincesToUse.filter((province) => province.regionId === currentRegion?.id).map((province) => (
+                  <button
+                    key={province.id}
+                    type="button"
+                    onClick={() => scrollToProvince(province.id)}
+                    className={`px-2 py-1 rounded-full border shadow-sm text-[10px] font-bold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-[#9e3c26] ${selectedProvinceId === province.id ? 'bg-[#9e3c26] text-white border-[#9e3c26]' : 'bg-white/95 text-[#1c1c17] border-[#ddc0ba]/60 hover:bg-[#ffdad2]'}`}
+                  >
+                    {lang === 'VI' ? province.name : province.nameJa}
+                  </button>
+                ))}
+              </div>
+              </div>
 
               {/* Legend Row */}
               <div className="mt-3 flex items-center justify-center gap-6 text-[12px] font-body text-[#57423d] border-t border-[#ddc0ba]/30 pt-2.5">
@@ -478,7 +541,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
           </div>
 
           {/* Region Quick Selector Pills (Direct access to all regions and provinces) */}
-          <div className="px-4 pb-3">
+          {country === 'JP' && <div className="px-4 pb-3">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
               <span className="text-[11px] font-bold text-[#8a726c] font-display whitespace-nowrap mr-1">
                 {lang === 'VI' ? 'Vùng:' : '地域:'}
@@ -490,14 +553,14 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
 
                 // Region label follows lang toggle
                 const regLabel = lang === 'VI'
-                  ? (country === 'VN' ? reg.name.replace(/^\d+\.\s*/, '') : reg.name)
+                  ? reg.name
                   : reg.nameJa;
 
                 return (
                   <button
                     key={reg.id}
                     type="button"
-                    onClick={() => setSelectedRegion(reg)}
+                    onClick={() => selectRegion(reg)}
                     className={`px-3 py-1.5 rounded-full text-[11px] font-display font-medium whitespace-nowrap transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
                       isSelected
                         ? 'bg-[#9e3c26] text-white shadow-xs font-bold ring-2 ring-[#ffdad2]'
@@ -516,7 +579,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                 );
               })}
             </div>
-          </div>
+          </div>}
 
           {/* Region Spotlight Details Card (Always populated with currentRegion) */}
           {currentRegion && (() => {
@@ -535,7 +598,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
 
             return (
               <div className="px-4 pb-3">
-                <div className="p-3.5 rounded-2xl bg-white shadow-xs border border-[#ddc0ba]/40 animate-fade-in">
+                <div id="region-detail" className="p-3.5 rounded-2xl bg-white shadow-xs border border-[#ddc0ba]/40 animate-fade-in scroll-mt-20">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <span
@@ -552,20 +615,6 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('detail');
-                        setSearchQuery('');
-                        setExpandedRegions((prev) => ({
-                          ...prev,
-                          [currentRegion.id]: true,
-                        }));
-                      }}
-                      className="text-[11px] px-2.5 py-1 rounded-full bg-[#f7f3eb] text-[#9e3c26] font-bold font-display hover:bg-[#ece8e0] transition-colors"
-                    >
-                      {lang === 'VI' ? 'Xem trong tab Chi tiết →' : '詳細一覧を見る →'}
-                    </button>
                   </div>
 
                   <p className="text-[12px] text-[#57423d] font-body bg-[#fbf8f2] p-2.5 rounded-xl border border-[#ddc0ba]/30 leading-relaxed">
@@ -587,31 +636,42 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {regionProvinces.map((p) => {
                         const isVisited = p.status === 'visited';
-                        const isWishlist = p.status === 'wishlist';
+                        const memoryCount = memoriesAtProvince(memories, country, p.id).length;
+                        const isWishlist = p.status === 'dream';
                         const isUnvisited = !isVisited && !isWishlist;
                         const pName = lang === 'VI' ? p.name : p.nameJa;
 
                         return (
                           <div
                             key={p.id}
+                            id={`province-${p.id}`}
+                            role={isAdmin || memoryCount > 0 ? 'button' : undefined}
+                            tabIndex={isAdmin || memoryCount > 0 ? 0 : undefined}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Enter' && event.key !== ' ') return;
+                              event.preventDefault();
+                              if (isAdmin) handleTogglePrefectureStatus(p.id, event);
+                                  else if (memoryCount > 0) { setSelectedProvinceId(p.id); onNavigateToMemories?.(country, p.id); }
+                            }}
                             onClick={(e) => {
                               if (isAdmin) {
                                 handleTogglePrefectureStatus(p.id, e);
-                              } else if (isVisited && onNavigateToMemories) {
-                                onNavigateToMemories(lang === 'VI' ? p.name : (p.nameJa || p.name));
+                              } else if (memoryCount > 0 && onNavigateToMemories) {
+                                    setSelectedProvinceId(p.id);
+                                    onNavigateToMemories(country, p.id);
                               }
                             }}
                             className={`group px-3.5 py-2.5 rounded-2xl bg-[#fbf9f5] border border-[#ddc0ba]/40 transition-all flex items-center justify-between gap-2 shadow-2xs ${
                               isAdmin
                                 ? 'cursor-pointer hover:border-[#9e3c26]/50'
-                                : isVisited
+                                : memoryCount > 0
                                 ? 'cursor-pointer hover:border-[#9e3c26] hover:bg-white hover:shadow-xs active:scale-[0.99]'
                                 : 'hover:border-[#ddc0ba]'
                             }`}
                             title={
                               isAdmin
                                 ? (lang === 'VI' ? 'Chạm để đổi trạng thái (Admin)' : 'タップして状態を変更')
-                                : isVisited
+                                : memoryCount > 0
                                 ? (lang === 'VI' ? `Chạm để xem các ký ức tại ${pName}` : `タップして${pName}の記憶を見る`)
                                 : undefined
                             }
@@ -625,7 +685,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                               >
                                 {pName}
                               </span>
-                              {isVisited && (
+                              {isVisited && memoryCount > 0 && (
                                 <span className="text-[10px] text-[#9e3c26] font-display hidden sm:inline-block font-semibold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                   {lang === 'VI' ? '• Xem ký ức' : '• 記憶'}
                                 </span>
@@ -651,8 +711,8 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                                   }
                                 >
                                   <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
-                                  <span>{lang === 'VI' ? 'Đã đi' : '訪問済'}</span>
-                                  {onNavigateToMemories && (
+                                  <span>{memoryCount > 0 ? `${memoryCount} ${lang === 'VI' ? 'ký ức' : '件'}` : (lang === 'VI' ? 'Đã đi' : '訪問済')}</span>
+                                  {memoryCount > 0 && onNavigateToMemories && (
                                     <ArrowRight className="w-3 h-3 text-white/80 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
                                   )}
                                 </span>
@@ -787,7 +847,11 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                     >
                       {/* Region Header matching image.png exactly */}
                       <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
                         onClick={() => toggleRegionExpand(region.id)}
+                        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRegionExpand(region.id); } }}
                         className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-[#fcfaf5] transition-colors border-b border-[#ddc0ba]/30"
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -821,7 +885,8 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                         <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[#fdf9f1]/35">
                           {regionPrefectures.map((pref) => {
                             const isVisited = pref.status === 'visited';
-                            const isWishlist = pref.status === 'wishlist';
+                            const memoryCount = memoriesAtProvince(memories, country, pref.id).length;
+                            const isWishlist = pref.status === 'dream';
                             const prefDisplayName = lang === 'VI' ? pref.name : pref.nameJa;
 
                             const isUnvisited = !isVisited && !isWishlist;
@@ -829,24 +894,34 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                             return (
                               <div
                                 key={pref.id}
+                                id={`detail-province-${pref.id}`}
+                                role={isAdmin || memoryCount > 0 ? 'button' : undefined}
+                                tabIndex={isAdmin || memoryCount > 0 ? 0 : undefined}
+                                onKeyDown={(event) => {
+                                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                                  event.preventDefault();
+                                  if (isAdmin) handleTogglePrefectureStatus(pref.id, event);
+                                  else if (memoryCount > 0) { setSelectedProvinceId(pref.id); onNavigateToMemories?.(country, pref.id); }
+                                }}
                                 onClick={(e) => {
                                   if (isAdmin) {
                                     handleTogglePrefectureStatus(pref.id, e);
-                                  } else if (isVisited && onNavigateToMemories) {
-                                    onNavigateToMemories(lang === 'VI' ? pref.name : (pref.nameJa || pref.name));
+                                  } else if (memoryCount > 0 && onNavigateToMemories) {
+                                    setSelectedProvinceId(pref.id);
+                                    onNavigateToMemories(country, pref.id);
                                   }
                                 }}
                                 className={`group px-3.5 py-2.5 rounded-2xl bg-[#fbf9f5] border border-[#ddc0ba]/40 transition-all flex items-center justify-between gap-2 shadow-2xs ${
                                   isAdmin
                                     ? 'cursor-pointer hover:border-[#9e3c26]/50'
-                                    : isVisited
+                                    : memoryCount > 0
                                     ? 'cursor-pointer hover:border-[#9e3c26] hover:bg-white hover:shadow-xs active:scale-[0.99]'
                                     : 'hover:border-[#ddc0ba]'
                                 }`}
                                 title={
                                   isAdmin
                                     ? (lang === 'VI' ? 'Chạm để đổi trạng thái (Admin)' : 'タップして状態を変更')
-                                    : isVisited
+                                    : memoryCount > 0
                                     ? (lang === 'VI' ? `Chạm để xem các ký ức tại ${prefDisplayName}` : `タップして${prefDisplayName}の記憶を見る`)
                                     : undefined
                                 }
@@ -860,7 +935,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                                   >
                                     {prefDisplayName}
                                   </span>
-                                  {isVisited && (
+                                  {isVisited && memoryCount > 0 && (
                                     <span className="text-[10px] text-[#9e3c26] font-display hidden sm:inline-block font-semibold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                       {lang === 'VI' ? '• Xem ký ức' : '• 記憶'}
                                     </span>
@@ -886,8 +961,8 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
                                       }
                                     >
                                       <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
-                                      <span>{lang === 'VI' ? 'Đã đi' : '訪問済'}</span>
-                                      {onNavigateToMemories && (
+                                      <span>{memoryCount > 0 ? `${memoryCount} ${lang === 'VI' ? 'ký ức' : '件'}` : (lang === 'VI' ? 'Đã đi' : '訪問済')}</span>
+                                      {memoryCount > 0 && onNavigateToMemories && (
                                         <ArrowRight className="w-3 h-3 text-white/80 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
                                       )}
                                     </span>
@@ -933,7 +1008,7 @@ export const JapanMapScreen: React.FC<JapanMapScreenProps> = ({
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2 h-2 rounded-full bg-[#3d653e] animate-pulse"></span>
               <span className="truncate font-semibold text-[#1c1c17]">
-                {lang === 'VI' ? 'Chế độ xem nhật ký của Thu Pham' : 'Thu Phamの旅の足跡 (閲覧モード)'}
+                {lang === 'VI' ? `Chế độ xem nhật ký của ${profile.authorName}` : `${profile.authorNameJa || profile.authorName}の旅の足跡 (閲覧モード)`}
               </span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

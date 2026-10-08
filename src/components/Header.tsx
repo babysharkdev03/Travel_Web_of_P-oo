@@ -2,6 +2,7 @@ import React from 'react';
 import { Language } from '../types';
 import { getT } from '../utils/translations';
 import { Volume2, Music } from 'lucide-react';
+import travelerAvatar from '../assets/traveler-avatar.png';
 
 interface HeaderProps {
   lang: Language;
@@ -9,6 +10,7 @@ interface HeaderProps {
   onOpenProfile: () => void;
   isPlayingMusic: boolean;
   onToggleMusic: () => void;
+  avatarUrl: string;
   isAdmin?: boolean;
   onOpenAdmin?: () => void;
   onLogoutAdmin?: () => void;
@@ -20,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   isPlayingMusic,
   onToggleMusic,
+  avatarUrl,
   isAdmin,
   onOpenAdmin,
   onLogoutAdmin,
@@ -151,7 +154,8 @@ export const Header: React.FC<HeaderProps> = ({
             <img
               alt="Traveler Avatar"
               className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida/AEtjO1WRld_vcTQyJSwa0_3pxU9wycVNGQVeVZAZIM5afYW-zJqTUroWEhcyGTtU2eO2j-2Qbcnx5lLCel9iX-2eUpFUZ29PU1A5fdbz6e2cbkAjlZs67pzUqEzCbSjNAY3446TyW5e0Zqv8jRfDRrntMRRvpStEtN4qGpnegtJirXQPl5dBIpto81I4OWZDPxovrzb-POas2KHQc0U7-d_mB7Lz1M12YOJeu_Qj5Atz1SGx5s13NkII1t3azuv3"
+              src={avatarUrl || travelerAvatar}
+              onError={(event) => { if (!event.currentTarget.src.endsWith(travelerAvatar)) event.currentTarget.src = travelerAvatar; }}
             />
           </button>
         </div>

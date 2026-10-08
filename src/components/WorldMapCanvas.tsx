@@ -1,51 +1,47 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CountryId, Language } from '../types';
-import { getT } from '../utils/translations';
 import { Compass, Plus, Minus, RotateCcw } from 'lucide-react';
+import worldMap from '../assets/world-map.svg';
+import { useMapGestures } from '../utils/useMapGestures';
 
 interface WorldMapCanvasProps {
   selectedCountry: CountryId;
   onSelectCountry: (country: CountryId) => void;
+  counts: Record<CountryId, number>;
   lang: Language;
 }
 
 export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
   selectedCountry,
   onSelectCountry,
+  counts,
   lang,
 }) => {
-  const t = getT(lang);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const { zoomLevel, setZoomLevel, pan, reset, gestures } = useMapGestures();
 
   const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.25, 2.0));
+    setZoomLevel((prev) => Math.min(prev + 0.25, 3.0));
   };
 
   const handleZoomOut = () => {
     setZoomLevel((prev) => Math.max(prev - 0.25, 1.0));
   };
 
-  const handleRecenter = () => {
-    setZoomLevel(1);
-    setPanOffset({ x: 0, y: 0 });
-  };
-
   return (
-    <div className="relative w-full h-[380px] rounded-2xl overflow-hidden shadow-[0_8px_24px_rgba(88,71,56,0.12)] bg-[#ece8e0] border border-[#ddc0ba]/40">
+    <div {...gestures} style={{ touchAction: 'none' }} className="relative w-full h-[380px] rounded-2xl overflow-hidden shadow-[0_8px_24px_rgba(88,71,56,0.12)] bg-[#ece8e0] border border-[#ddc0ba]/40">
       {/* Zoomable Container */}
       <div
         className="w-full h-full relative transition-transform duration-300 ease-out"
         style={{
-          transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
           transformOrigin: '78% 48%',
         }}
       >
         {/* World Map Background Image */}
         <img
-          src="https://lh3.googleusercontent.com/aida/AEtjO1V-O1Puj2tKLj1_WgagZKVeO1k6cX7bl-H7epm2gW9qY1W0Xi-i-oi1V87PZXWTwjBFt2ageglZYMVBVQbOMSmBT6v05SzCMxIJcXOtOEe66YzfdMnvBDZE8rEKTQxGYRV_cso6AnX68vGzHrfAU5LQSpT5x9unYv94sw_8FvdBGZiYNnvUMg0pMfQytkLPoMS_gB-zHHaWXpID_pI87zL-Ln5Ir0XdXKn7LCTttjVFznxk2A5OXyP2v9bN"
-          alt="Bản đồ thế giới minh họa ký ức"
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          src={worldMap}
+          alt={lang === 'VI' ? 'Bản đồ thế giới minh họa ký ức' : '旅の記憶を示す世界地図'}
+          className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
         />
 
         {/* Subtle Warm Vignette Overlay */}
@@ -59,7 +55,7 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           preserveAspectRatio="none"
         >
           <path
-            d="M 76 57 Q 81 48 84 40"
+            d="M 79 42 Q 83 35 88 30"
             stroke="#9e3c26"
             strokeWidth="1.2"
             strokeDasharray="2 2.5"
@@ -69,12 +65,11 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           />
         </svg>
 
-        {/* PIN 1: VIỆT NAM (~76% left, ~57% top) */}
+        {/* PIN 1: VIỆT NAM */}
         <div
-          className={`absolute left-[76%] top-[57%] -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer transition-transform duration-200 ${
+          className={`absolute left-[79%] top-[42%] -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer transition-transform duration-200 ${
             selectedCountry === 'VN' ? 'scale-110 z-30' : 'hover:scale-105'
           }`}
-          onClick={() => onSelectCountry('VN')}
         >
           {/* Ripple Pulse Effect */}
           <div className="absolute -inset-2.5 rounded-full bg-[#da251d]/25 animate-ping pointer-events-none" />
@@ -83,7 +78,8 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           {/* Vietnam Flag Round Button */}
           <button
             type="button"
-            aria-label="Chọn Việt Nam"
+            aria-label={lang === 'VI' ? 'Chọn Việt Nam' : 'ベトナムを選択'}
+            onClick={() => onSelectCountry('VN')}
             className={`relative w-9 h-9 rounded-full bg-[#da251d] text-white flex items-center justify-center shadow-[0_3px_8px_rgba(218,37,29,0.5)] border-2 ${
               selectedCountry === 'VN' ? 'border-[#ff0] ring-3 ring-[#da251d]/40' : 'border-white'
             }`}
@@ -94,7 +90,7 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           </button>
 
           {/* Vietnam Tooltip Badge */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-10 whitespace-nowrap z-30 pointer-events-none">
+          <div className="absolute right-0 top-10 whitespace-nowrap z-30 pointer-events-none">
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md shadow-md border transition-all ${
                 selectedCountry === 'VN'
@@ -103,19 +99,18 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
               }`}
             >
               <span className="font-display text-[11px] leading-tight text-[#9e3c26] font-bold">
-                {t.vietnamPin}
+                {lang === 'VI' ? `VN • Việt Nam (${counts.VN} ký ức)` : `VN • ベトナム (${counts.VN}件)`}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#3d653e]" />
             </div>
           </div>
         </div>
 
-        {/* PIN 2: NHẬT BẢN (~84% left, ~40% top) */}
+        {/* PIN 2: NHẬT BẢN */}
         <div
-          className={`absolute left-[84%] top-[40%] -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer transition-transform duration-200 ${
+          className={`absolute left-[88%] top-[30%] -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer transition-transform duration-200 ${
             selectedCountry === 'JP' ? 'scale-110 z-30' : 'hover:scale-105'
           }`}
-          onClick={() => onSelectCountry('JP')}
         >
           {/* Ripple Pulse Effect */}
           <div className="absolute -inset-2.5 rounded-full bg-[#1d6774]/25 animate-ping pointer-events-none" />
@@ -124,7 +119,8 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           {/* Japan Flag Round Button */}
           <button
             type="button"
-            aria-label="Chọn Nhật Bản"
+            aria-label={lang === 'VI' ? 'Chọn Nhật Bản' : '日本を選択'}
+            onClick={() => onSelectCountry('JP')}
             className={`relative w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-[0_3px_8px_rgba(29,103,116,0.4)] border-2 ${
               selectedCountry === 'JP' ? 'border-[#bc002d] ring-3 ring-[#1d6774]/40' : 'border-white'
             }`}
@@ -133,7 +129,7 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
           </button>
 
           {/* Japan Tooltip Badge */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-10 whitespace-nowrap z-30 pointer-events-none">
+          <div className="absolute right-0 bottom-10 whitespace-nowrap z-30 pointer-events-none">
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md shadow-md border transition-all ${
                 selectedCountry === 'JP'
@@ -142,7 +138,7 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
               }`}
             >
               <span className="font-display text-[11px] leading-tight text-[#1d6774] font-bold">
-                {t.japanPin}
+                {lang === 'VI' ? `JP • Nhật Bản (${counts.JP} ký ức)` : `JP • 日本 (${counts.JP}件)`}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#9e3c26]" />
             </div>
@@ -156,10 +152,10 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
       </div>
 
       {/* Map Controller Floating Pill (Zoom / Recenter) */}
-      <div className="absolute bottom-3 left-3 z-30 flex items-center gap-1 p-1 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-[#ddc0ba]/50">
+      <div className="hidden sm:flex absolute bottom-3 left-3 z-30 items-center gap-1 p-1 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-[#ddc0ba]/50">
         <button
           type="button"
-          aria-label="Phóng to"
+          aria-label={lang === 'VI' ? 'Phóng to' : '拡大'}
           onClick={handleZoomIn}
           className="w-7 h-7 rounded-full flex items-center justify-center text-[#1c1c17] hover:bg-[#f1ede6] active:scale-90 transition-transform"
         >
@@ -167,7 +163,7 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
         </button>
         <button
           type="button"
-          aria-label="Thu nhỏ"
+          aria-label={lang === 'VI' ? 'Thu nhỏ' : '縮小'}
           onClick={handleZoomOut}
           className="w-7 h-7 rounded-full flex items-center justify-center text-[#1c1c17] hover:bg-[#f1ede6] active:scale-90 transition-transform"
         >
@@ -175,8 +171,8 @@ export const WorldMapCanvas: React.FC<WorldMapCanvasProps> = ({
         </button>
         <button
           type="button"
-          aria-label="Đặt lại góc nhìn"
-          onClick={handleRecenter}
+          aria-label={lang === 'VI' ? 'Đặt lại góc nhìn' : '表示をリセット'}
+          onClick={reset}
           className="w-7 h-7 rounded-full flex items-center justify-center text-[#1c1c17] hover:bg-[#f1ede6] active:scale-90 transition-transform"
         >
           <RotateCcw className="w-3.5 h-3.5" />

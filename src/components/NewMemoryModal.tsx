@@ -12,6 +12,7 @@ import {
   Edit3,
 } from 'lucide-react';
 import { locationHierarchyData } from '../data/locationHierarchy';
+import { resolveProvinceId } from '../utils/memoryLocations';
 import { NotionJournalEditor } from './NotionJournalEditor';
 import { NotionMagazineView } from './NotionMagazineView';
 
@@ -133,6 +134,7 @@ export const NewMemoryModal: React.FC<NewMemoryModalProps> = ({
       titleJa: titleJa.trim() || title.trim(),
       countryId,
       regionId: selectedRegionId,
+      provinceId: resolveProvinceId(countryId, fullLocationDisplay, selectedLocationId),
       locationName: fullLocationDisplay,
       specificSpot: specificSpot.trim(),
       date,

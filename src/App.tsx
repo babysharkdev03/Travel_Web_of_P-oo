@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ScreenType, CountryId, Language, Memory, Prefecture, Region, Place, ProfileData } from './types';
+import { ScreenType, CountryId, Language, Memory, Prefecture, Region, Place, ProfileData, PrefectureStatus } from './types';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { WorldMapScreen } from './components/WorldMapScreen';
@@ -15,9 +15,29 @@ import { initialMemories, curatedPlaces, initialProfile } from './data/memoriesD
 import { allJapanPrefectures, vietnamRegions, allVietnamProvinces } from './data/regionsData';
 import { PianoPlayerBox } from './components/PianoPlayerBox';
 import { cozyAudio } from './utils/audioPlayer';
+import { memoriesAtProvince } from './utils/memoryLocations';
+
+const normalizeStatus = (value: string): PrefectureStatus =>
+  value === 'visited' ? 'visited' : value === 'wishlist' || value === 'dream' ? 'dream' : 'not_visited';
+
+const restoreProvinces = (saved: string | null, defaults: Prefecture[]): Prefecture[] => {
+  if (!saved) return defaults;
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return defaults;
+    const savedById = new Map(parsed.map((province: Prefecture) => [province.id, province]));
+    return defaults.map((province) => {
+      const previous = savedById.get(province.id) as Prefecture | undefined;
+      return previous ? { ...province, status: normalizeStatus(previous.status) } : province;
+    });
+  } catch {
+    return defaults;
+  }
+};
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('world-map');
+  const [screenHistory, setScreenHistory] = useState<{ screen: ScreenType; scrollY: number }[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<CountryId>('JP');
   const [lang, setLang] = useState<Language>('VI');
 
@@ -48,14 +68,7 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= initialMemories.length) {
-          return parsed;
-        }
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((m: any) => m.id));
-          const missing = initialMemories.filter((m) => !existingIds.has(m.id));
-          return [...parsed, ...missing];
-        }
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         return initialMemories;
       }
@@ -68,47 +81,16 @@ export default function App() {
   }, [memories]);
 
   // 2. Japan Prefectures State with Local Persistence
-  const [prefectures, setPrefectures] = useState<Prefecture[]>(() => {
-    const saved = localStorage.getItem('cozy_island_prefectures');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return allJapanPrefectures;
-      }
-    }
-    return allJapanPrefectures;
-  });
+  const [prefectures, setPrefectures] = useState<Prefecture[]>(() =>
+    restoreProvinces(localStorage.getItem('cozy_island_prefectures'), allJapanPrefectures));
 
   useEffect(() => {
     localStorage.setItem('cozy_island_prefectures', JSON.stringify(prefectures));
   }, [prefectures]);
 
   // 3. Vietnam Regions & Provinces State with Local Persistence
-  const [vietnamProvinces, setVietnamProvinces] = useState<Prefecture[]>(() => {
-    const saved = localStorage.getItem('cozy_island_vietnam_provinces');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === allVietnamProvinces.length) {
-          const hasAllIds = allVietnamProvinces.every((p) => parsed.some((sp: any) => sp.id === p.id));
-          if (hasAllIds) return parsed;
-        }
-        if (Array.isArray(parsed)) {
-          const statusMap = new Map<string, 'visited' | 'wishlist' | 'unvisited'>(
-            parsed.map((p: any) => [p.id, p.status])
-          );
-          return allVietnamProvinces.map((prov) => ({
-            ...prov,
-            status: statusMap.get(prov.id) || prov.status,
-          }));
-        }
-      } catch (e) {
-        return allVietnamProvinces;
-      }
-    }
-    return allVietnamProvinces;
-  });
+  const [vietnamProvinces, setVietnamProvinces] = useState<Prefecture[]>(() =>
+    restoreProvinces(localStorage.getItem('cozy_island_vietnam_provinces'), allVietnamProvinces));
 
   useEffect(() => {
     localStorage.setItem('cozy_island_vietnam_provinces', JSON.stringify(vietnamProvinces));
@@ -118,18 +100,18 @@ export default function App() {
     return vietnamRegions.map((region) => {
       const regionProvs = vietnamProvinces.filter((p) => region.prefectureIds.includes(p.id));
       const visited = regionProvs.filter((p) => p.status === 'visited').length;
-      const wishlist = regionProvs.filter((p) => p.status === 'wishlist').length;
+      const wishlist = regionProvs.filter((p) => p.status === 'dream').length;
       return {
         ...region,
         totalPrefectures: region.prefectureIds.length,
         visitedPrefectures: visited,
         wishlistCount: wishlist,
-        status: (visited > 0 ? 'visited' : wishlist > 0 ? 'wishlist' : 'unvisited') as 'visited' | 'wishlist' | 'unvisited',
+        status: (visited > 0 ? 'visited' : wishlist > 0 ? 'dream' : 'not_visited') as 'visited' | 'dream' | 'not_visited',
       };
     });
   }, [vietnamProvinces]);
 
-  const handleUpdateVietnamProvinceStatus = (id: string, status: 'visited' | 'wishlist' | 'unvisited') => {
+  const handleUpdateVietnamProvinceStatus = (id: string, status: 'visited' | 'dream' | 'not_visited') => {
     setVietnamProvinces((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
     );
@@ -157,7 +139,14 @@ export default function App() {
     const saved = localStorage.getItem('cozy_island_profile');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const previous = JSON.parse(saved) as ProfileData;
+        return {
+          ...initialProfile,
+          ...previous,
+          authorName: previous.authorName === 'Thu Pham (phamthuhp031103)' ? initialProfile.authorName : previous.authorName,
+          authorNameJa: previous.authorNameJa || initialProfile.authorNameJa,
+          avatarUrl: previous.avatarUrl?.startsWith('https://lh3.googleusercontent.com/aida/') ? initialProfile.avatarUrl : previous.avatarUrl,
+        };
       } catch (e) {
         return initialProfile;
       }
@@ -195,20 +184,41 @@ export default function App() {
   const [isNewMemoryOpen, setIsNewMemoryOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [memoryFilterKeyword, setMemoryFilterKeyword] = useState<string>('');
+  const [memoryLocationFilter, setMemoryLocationFilter] = useState<{ country: CountryId; provinceId: string } | null>(null);
+
+  const navigateTo = (screen: ScreenType) => {
+    if (screen !== currentScreen) {
+      setScreenHistory((history) => [...history, { screen: currentScreen, scrollY: window.scrollY }]);
+      setCurrentScreen(screen);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateBack = () => {
+    const previous = screenHistory[screenHistory.length - 1];
+    if (!previous) return;
+    setScreenHistory((history) => history.slice(0, -1));
+    setCurrentScreen(previous.screen);
+    window.requestAnimationFrame(() => window.scrollTo({ top: previous.scrollY, behavior: 'instant' }));
+  };
 
   // Navigation Handlers
   const handleNavigateToRegionMap = (country: CountryId) => {
     setSelectedCountry(country);
-    setCurrentScreen('japan-map');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigateTo('japan-map');
   };
 
   const handleNavigateToMemories = (keyword?: string) => {
-    if (keyword) {
-      setMemoryFilterKeyword(keyword);
-    }
-    setCurrentScreen('memories');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setMemoryLocationFilter(null);
+    setMemoryFilterKeyword(keyword || '');
+    navigateTo('memories');
+  };
+
+  const handleNavigateToProvinceMemories = (country: CountryId, provinceId: string) => {
+    if (memoriesAtProvince(memories, country, provinceId).length === 0) return;
+    setMemoryLocationFilter({ country, provinceId });
+    setMemoryFilterKeyword('');
+    navigateTo('memories');
   };
 
   const handleToggleFavorite = (id: string) => {
@@ -258,13 +268,13 @@ export default function App() {
     }
   };
 
-  const handleUpdatePrefectureStatus = (id: string, status: 'visited' | 'wishlist' | 'unvisited') => {
+  const handleUpdatePrefectureStatus = (id: string, status: 'visited' | 'dream' | 'not_visited') => {
     setPrefectures((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
     );
   };
 
-  const handleUpdateVietnamRegionStatus = (id: string, status: 'visited' | 'wishlist' | 'unvisited') => {
+  const handleUpdateVietnamRegionStatus = (id: string, status: 'visited' | 'dream' | 'not_visited') => {
     const targetRegion = vietnamRegions.find((r) => r.id === id);
     if (!targetRegion) return;
     setVietnamProvinces((prev) =>
@@ -300,8 +310,12 @@ export default function App() {
 
   const handleImportData = (data: any) => {
     if (data.memories) setMemories(data.memories);
-    if (data.prefectures) setPrefectures(data.prefectures);
-    if (data.vietnamProvinces) setVietnamProvinces(data.vietnamProvinces);
+    if (Array.isArray(data.prefectures)) {
+      setPrefectures(data.prefectures.map((province: Prefecture) => ({ ...province, status: normalizeStatus(province.status) })));
+    }
+    if (Array.isArray(data.vietnamProvinces)) {
+      setVietnamProvinces(data.vietnamProvinces.map((province: Prefecture) => ({ ...province, status: normalizeStatus(province.status) })));
+    }
     if (data.places) setPlaces(data.places);
     if (data.profile) setProfile(data.profile);
   };
@@ -313,6 +327,7 @@ export default function App() {
       {/* Top Header (Thanh Top Bar gọn gàng, không chứa khung nhạc) */}
       <Header
         lang={lang}
+        avatarUrl={profile.avatarUrl}
         onToggleLang={setLang}
         onOpenProfile={() => setIsProfileOpen(true)}
         isAdmin={isAdmin}
@@ -333,24 +348,26 @@ export default function App() {
 
       {/* Main Screen Content Body */}
       <main className="flex-1 w-full max-w-[440px] mx-auto min-h-screen relative">
-        {currentScreen === 'world-map' && (
+        <div hidden={currentScreen !== 'world-map'}>
           <WorldMapScreen
             selectedCountry={selectedCountry}
             onSelectCountry={setSelectedCountry}
             onNavigateToRegionMap={handleNavigateToRegionMap}
             onSelectMemory={setActiveMemory}
             memories={memories}
+            profile={profile}
+            onNavigateToMemories={() => handleNavigateToMemories()}
             lang={lang}
           />
-        )}
+        </div>
 
-        {currentScreen === 'japan-map' && (
+        <div hidden={currentScreen !== 'japan-map'}>
           <JapanMapScreen
             country={selectedCountry}
             onChangeCountry={setSelectedCountry}
             onOpenNewMemory={() => setIsNewMemoryOpen(true)}
             onSelectMemory={setActiveMemory}
-            onNavigateToMemories={handleNavigateToMemories}
+            onNavigateToMemories={handleNavigateToProvinceMemories}
             memories={memories}
             prefectures={prefectures}
             onUpdatePrefectureStatus={handleUpdatePrefectureStatus}
@@ -360,20 +377,22 @@ export default function App() {
             isAdmin={isAdmin}
             onOpenAdmin={handleOpenAdmin}
             lang={lang}
+            profile={profile}
           />
-        )}
+        </div>
 
-        {currentScreen === 'places' && (
+        <div hidden={currentScreen !== 'places'}>
           <PlacesScreen
             places={places}
+            memories={memories}
             isAdmin={isAdmin}
             onOpenAdmin={handleOpenAdmin}
             lang={lang}
-            onNavigateToMemoriesWithLocation={handleNavigateToMemories}
+            onNavigateToProvinceMemories={handleNavigateToProvinceMemories}
           />
-        )}
+        </div>
 
-        {currentScreen === 'memories' && (
+        <div hidden={currentScreen !== 'memories'}>
           <MemoriesScreen
             memories={memories}
             onSelectMemory={setActiveMemory}
@@ -383,14 +402,21 @@ export default function App() {
             lang={lang}
             initialSearchQuery={memoryFilterKeyword}
             onClearInitialSearch={() => setMemoryFilterKeyword('')}
+            locationFilter={memoryLocationFilter}
+            onClearLocationFilter={() => setMemoryLocationFilter(null)}
+            onBack={screenHistory.length > 0 ? navigateBack : undefined}
           />
-        )}
+        </div>
       </main>
 
       {/* Persistent Floating Bottom Navigation Bar */}
       <BottomNav
         currentScreen={currentScreen}
-        onNavigate={setCurrentScreen}
+        onNavigate={(screen) => {
+          setMemoryLocationFilter(null);
+          setMemoryFilterKeyword('');
+          navigateTo(screen);
+        }}
         lang={lang}
       />
 
@@ -400,6 +426,7 @@ export default function App() {
         onClose={() => setActiveMemory(null)}
         onToggleFavorite={handleToggleFavorite}
         lang={lang}
+        profile={profile}
       />
 
       <NewMemoryModal

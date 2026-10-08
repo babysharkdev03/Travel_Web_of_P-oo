@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Language, Memory, CountryId } from '../types';
 import { getT } from '../utils/translations';
+import { findProvince, memoryLocationLabel, memoryProvinceId, placeLabel } from '../utils/memoryLocations';
+import { allJapanPrefectures, allVietnamProvinces } from '../data/regionsData';
 import {
   BookOpen,
   Calendar,
@@ -18,7 +20,8 @@ import {
   X,
   Music,
   ChevronRight,
-  Filter
+  Filter,
+  ArrowLeft
 } from 'lucide-react';
 
 interface MemoriesScreenProps {
@@ -30,6 +33,9 @@ interface MemoriesScreenProps {
   lang: Language;
   initialSearchQuery?: string;
   onClearInitialSearch?: () => void;
+  locationFilter?: { country: CountryId; provinceId: string } | null;
+  onClearLocationFilter?: () => void;
+  onBack?: () => void;
 }
 
 export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
@@ -41,6 +47,9 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
   lang,
   initialSearchQuery,
   onClearInitialSearch,
+  locationFilter,
+  onClearLocationFilter,
+  onBack,
 }) => {
   const t = getT(lang);
 
@@ -57,6 +66,19 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
       setSelectedCity('all');
     }
   }, [initialSearchQuery]);
+
+  React.useEffect(() => {
+    if (locationFilter) {
+      setFilterCountry(locationFilter.country);
+      setSelectedCity('all');
+      setFilterWeather('all');
+      setSearchQuery('');
+    } else {
+      setFilterCountry('all');
+      setSelectedCity('all');
+      setFilterWeather('all');
+    }
+  }, [locationFilter]);
   
   // UC2: View Mode ('timeline' vs 'grid') & Sort Direction ('newest' vs 'oldest')
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
@@ -136,6 +158,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
       .filter((m) => {
         // Country filter
         if (filterCountry !== 'all' && m.countryId !== filterCountry) return false;
+        if (locationFilter && (m.countryId !== locationFilter.country || memoryProvinceId(m) !== locationFilter.provinceId)) return false;
 
         // City filter
         if (selectedCity !== 'all') {
@@ -153,8 +176,10 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
           const matchLoc = m.locationName.toLowerCase().includes(q) || (m.specificSpot && m.specificSpot.toLowerCase().includes(q));
           const matchNotes = m.notes.toLowerCase().includes(q) || m.notesJa.toLowerCase().includes(q);
           const matchTag = m.tag.toLowerCase().includes(q);
+          const matchedProvince = findProvince(m.countryId, q);
+          const matchMappedLocation = matchedProvince && memoryProvinceId(m) === matchedProvince.id;
 
-          if (!matchTitle && !matchLoc && !matchNotes && !matchTag) return false;
+          if (!matchTitle && !matchLoc && !matchNotes && !matchTag && !matchMappedLocation) return false;
         }
 
         return true;
@@ -164,7 +189,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
         const dateB = new Date(b.date).getTime();
         return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
       });
-  }, [memories, filterCountry, selectedCity, filterWeather, searchQuery, sortOrder]);
+  }, [memories, filterCountry, selectedCity, filterWeather, searchQuery, sortOrder, locationFilter]);
 
   // Group memories by Month-Year for the vertical timeline
   const groupedTimeline = useMemo(() => {
@@ -191,9 +216,19 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
   };
 
   const tokyoMemoriesCount = memories.filter((m) => getCityName(m) === 'Tokyo').length;
+  const selectedProvince = locationFilter
+    ? (locationFilter.country === 'JP' ? allJapanPrefectures : allVietnamProvinces).find((province) => province.id === locationFilter.provinceId)
+    : undefined;
 
   return (
     <div className="flex flex-col w-full pb-32 pt-2">
+      {(onBack || selectedProvince) && (
+        <div className="px-4 pb-3 flex items-center gap-2">
+          {onBack && <button type="button" onClick={onBack} className="min-h-9 px-3 rounded-full bg-white border border-[#ddc0ba]/50 text-[#9e3c26] text-[12px] font-bold flex items-center gap-1"><ArrowLeft className="w-4 h-4" />{lang === 'VI' ? 'Quay lại' : '戻る'}</button>}
+          {selectedProvince && <span className="text-[12px] text-[#57423d] truncate">{lang === 'VI' ? selectedProvince.name : selectedProvince.nameJa} · {filteredMemories.length} {lang === 'VI' ? 'ký ức' : '件'}</span>}
+          {selectedProvince && <button type="button" onClick={onClearLocationFilter} className="ml-auto text-[12px] text-[#9e3c26] underline whitespace-nowrap">{lang === 'VI' ? 'Bỏ lọc' : '解除'}</button>}
+        </div>
+      )}
       {/* 1. Header Widget & View Mode Switcher */}
       <div className="px-4 pb-3">
         <div className="p-4 rounded-3xl bg-white shadow-xs border border-[#ddc0ba]/40">
@@ -373,7 +408,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
                       }`}
                     >
                       <span>{c.emoji}</span>
-                      <span>{c.name}</span>
+                      <span>{placeLabel(c.countryId, c.name, lang)}</span>
                       <span className={`text-[10px] px-1 py-0.2 rounded-full font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-[#e7e1d5] text-[#8a726c]'}`}>
                         {c.count}
                       </span>
@@ -509,6 +544,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
                 setFilterCountry('all');
                 setSelectedCity('all');
                 setFilterWeather('all');
+                onClearLocationFilter?.();
               }}
               className="px-4 py-2 bg-[#9e3c26] text-white text-[12px] font-bold font-display rounded-full shadow-xs hover:bg-[#822714] transition-all"
             >
@@ -549,9 +585,10 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
                         <div className="absolute -left-[19px] top-5 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#9e3c26] shadow-xs group-hover:scale-125 group-hover:bg-[#9e3c26] transition-all z-10" />
 
                         {/* Memory Card along Timeline */}
-                        <div
+                        <button
+                          type="button"
                           onClick={() => onSelectMemory(memory)}
-                          className="p-4 rounded-3xl bg-white shadow-[0_4px_16px_rgba(88,71,56,0.06)] border border-[#ddc0ba]/50 hover:border-[#9e3c26]/40 hover:shadow-md transition-all cursor-pointer active:scale-[0.99] flex flex-col gap-3"
+                          className="w-full text-left p-3 rounded-2xl bg-white shadow-sm border border-[#ddc0ba]/50 hover:border-[#9e3c26]/40 hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#9e3c26] transition-all cursor-pointer flex flex-col gap-2"
                         >
                           {/* Card Meta Header */}
                           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -564,8 +601,8 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
                               {/* City & spot tag */}
                               <span className="px-2.5 py-0.5 rounded-full bg-[#f1ede6] text-[#57423d] text-[11px] font-display font-medium flex items-center gap-1">
                                 <span>{memory.countryId === 'JP' ? '🇯🇵' : '🇻🇳'}</span>
-                                <span className="font-bold text-[#1c1c17]">{city}</span>
-                                {memory.specificSpot && (
+                                <span className="font-bold text-[#1c1c17]">{placeLabel(memory.countryId, city, lang, memoryProvinceId(memory))}</span>
+                                {lang === 'VI' && memory.specificSpot && (
                                   <>
                                     <span>•</span>
                                     <span className="truncate max-w-[130px]">{memory.specificSpot}</span>
@@ -581,32 +618,13 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
 
                             {/* Days ago & Favorite */}
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-[#8a726c] font-body">
-                                {lang === 'VI' ? memory.daysAgoText : memory.daysAgoTextJa}
-                              </span>
                               {memory.isFavorite && (
                                 <Heart className="w-3.5 h-3.5 text-[#9e3c26] fill-current" />
                               )}
                             </div>
                           </div>
 
-                          {/* Image Container */}
-                          <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden bg-[#e5dfd5] border border-[#ddc0ba]/40">
-                            <img
-                              src={memory.image}
-                              alt={memory.imageAlt}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                            {/* Sound track chip */}
-                            {memory.soundtrack && (
-                              <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-display">
-                                <Music className="w-3 h-3 text-[#ffdad2]" />
-                                <span className="truncate max-w-[180px]">{memory.soundtrack}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Text Excerpt & Title */}
+                          {/* Compact title and location */}
                           <div className="flex flex-col gap-1.5">
                             <h3 className="font-bold text-[16px] text-[#1c1c17] font-display group-hover:text-[#9e3c26] transition-colors line-clamp-1">
                               {lang === 'VI' ? memory.title : memory.titleJa}
@@ -614,27 +632,19 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
 
                             <div className="flex items-center gap-1 text-[11px] text-[#8a726c] font-body">
                               <MapPin className="w-3 h-3 text-[#9e3c26] flex-shrink-0" />
-                              <span className="truncate">{memory.locationName}</span>
+                              <span className="truncate">{memoryLocationLabel(memory, lang)}</span>
                             </div>
 
-                            <p className="text-[12px] text-[#57423d] font-body line-clamp-2 leading-relaxed bg-[#fbf9f5] p-2.5 rounded-xl border border-[#ddc0ba]/20 mt-1">
-                              {lang === 'VI'
-                                ? memory.notes.replace(/\[.*?\]/g, '').replace(/#+/g, '').trim()
-                                : memory.notesJa}
-                            </p>
                           </div>
 
                           {/* Card Footer Action */}
-                          <div className="flex items-center justify-between pt-1 border-t border-[#ddc0ba]/20 text-[11px]">
-                            <span className="text-[#8a726c] font-display">
-                              {memory.postcardsCount || 4} {lang === 'VI' ? 'ảnh ghi lại' : '枚の写真'}
-                            </span>
-                            <span className="font-bold text-[#9e3c26] font-display flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                              <span>{lang === 'VI' ? 'Đọc nhật ký' : '続きを読む'}</span>
+                          <div className="flex items-center justify-end text-[11px]">
+                            <span className="font-bold text-[#9e3c26] font-display flex items-center gap-0.5">
+                              <span>{lang === 'VI' ? 'Đọc thêm' : '続きを読む'}</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </span>
                           </div>
-                        </div>
+                        </button>
                       </div>
                     );
                   })}
@@ -669,7 +679,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                     <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[11px] font-display font-medium flex items-center gap-1">
                       <span>{getWeatherIcon(memory.weather)}</span>
-                      <span>{city}</span>
+                      <span>{placeLabel(memory.countryId, city, lang, memoryProvinceId(memory))}</span>
                     </span>
                   </div>
 
@@ -692,7 +702,7 @@ export const MemoriesScreen: React.FC<MemoriesScreenProps> = ({
 
                   <div className="flex items-center gap-1 text-[11px] text-[#57423d] font-body">
                     <MapPin className="w-3.5 h-3.5 text-[#9e3c26] flex-shrink-0" />
-                    <span className="truncate">{memory.specificSpot || memory.locationName}</span>
+                    <span className="truncate">{lang === 'VI' ? (memory.specificSpot || memory.locationName) : memoryLocationLabel(memory, lang)}</span>
                   </div>
 
                   <p className="text-[12px] text-[#57423d] font-body line-clamp-2 leading-relaxed bg-[#fbf9f5] p-2 rounded-xl border border-[#ddc0ba]/20 mt-1">

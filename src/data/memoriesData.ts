@@ -1,8 +1,10 @@
 import { Memory, Place, ProfileData } from '../types';
+import travelerAvatar from '../assets/traveler-avatar.png';
 
 export const initialMemories: Memory[] = [
   {
     id: 'mem-sakai-notion',
+    provinceId: 'osaka',
     icon: '🌸',
     title: 'S-a-k-a-i • Hành Trình Phố Cổ & Trà Đạo',
     titleJa: 'S-a-k-a-i • 堺の町並みと茶の湯の旅',
@@ -49,6 +51,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-kyoto-torii',
+    provinceId: 'kyoto',
     icon: '⛩️',
     title: 'Cổng Torii Linh Thiêng',
     titleJa: '伏見稲荷の千本鳥居',
@@ -73,6 +76,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-tokyo-shinjuku',
+    provinceId: 'tokyo',
     icon: '🌧️',
     title: 'Góc Phố Mưa Shinjuku & Cà Phê Đĩa Than',
     titleJa: '新宿の雨上がりの夜 & レコード喫茶',
@@ -97,6 +101,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-hoian-river',
+    provinceId: 'quangnam',
     icon: '🏮',
     title: 'Phố Cổ Sông Hoài & Đêm Rằm Hoa Đăng',
     titleJa: '懐河沿いのホイアン旧市街 & ランタン祭り',
@@ -121,6 +126,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-danang-sontra',
+    provinceId: 'danang',
     icon: '🌊',
     title: 'Bình Minh Bán Đảo Sơn Trà & Đỉnh Bàn Cờ',
     titleJa: 'ソンチャ半島の朝日 & 頂上展望台',
@@ -145,6 +151,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-tokyo-asakusa',
+    provinceId: 'tokyo',
     icon: '🏮',
     title: 'Sớm Mai Tĩnh Mịch Chùa Senso-ji & Ngõ Mèo Yanaka',
     titleJa: '浅草寺の朝の静寂 & 谷中銀座の路地裏',
@@ -169,6 +176,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-nagano-snow',
+    provinceId: 'nagano',
     icon: '❄️',
     title: 'Suối Ấm Mùa Đông Nagano & Vùng Núi Tuyết',
     titleJa: '信州長野の雪見露天風呂 & 地獄谷温泉',
@@ -193,6 +201,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-tokyo-shibuya',
+    provinceId: 'tokyo',
     icon: '🗼',
     title: 'Hoàng Hôn Shibuya Sky & Chiều Tản Bộ Yoyogi',
     titleJa: '渋谷スカイの夕暮れ & 代々木公園の散歩道',
@@ -217,6 +226,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-hanoi-oldquarter',
+    provinceId: 'hanoi',
     icon: '🏛️',
     title: 'Sớm Thu Hà Nội & Vị Cà Phê Trứng Cổ',
     titleJa: 'ハノイの秋の朝 & 伝統のエッグコーヒー',
@@ -241,6 +251,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-tokyo-ginza',
+    provinceId: 'tokyo',
     icon: '☕',
     title: 'Hoài Niệm Tokyo Thập Niên 80 & Tách Nel Drip Ginza',
     titleJa: '80年代の銀座喫茶店 & ネルドリップ珈琲',
@@ -265,6 +276,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-saigon-bachdang',
+    provinceId: 'tphcm',
     icon: '🏙️',
     title: 'Chiều Mưa Bến Bạch Đằng & Hẻm Nhỏ Sài Gòn',
     titleJa: '雨のバクダン埠頭 & サイゴンの路地裏',
@@ -289,6 +301,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ cổ kính của vùng đ
   },
   {
     id: 'mem-tokyo-tsukishima',
+    provinceId: 'tokyo',
     icon: '🌉',
     title: 'Phố Bờ Sông Tsukishima & Gió Biển Tokyo Bay',
     titleJa: '月島の川沿い散歩 & もんじゃストリート',
@@ -467,12 +480,13 @@ export const curatedPlaces: Place[] = [
 ];
 
 export const initialProfile: ProfileData = {
-  authorName: 'Thu Pham (phamthuhp031103)',
+  authorName: 'Phạm Thanh Thư',
+  authorNameJa: 'ファム　タイン　トゥー',
   travelerTitle: 'Nhà Khám Phá Phương Đông • Cấp 12',
   travelerTitleJa: '東洋の冒険者 • レベル12',
   quoteVi: 'Mỗi chuyến đi là một trang nhật ký viết bằng bước chân và trái tim. Từ những ngõ nhỏ Tokyo đến dải đất duyên hải miền Trung quê hương.',
   quoteJa: 'すべての旅は、足跡と心で紡ぐ記憶のページ。東京の路地裏から、故郷ベトナム中部の美しい海岸線まで。',
-  avatarUrl: 'https://lh3.googleusercontent.com/aida/AEtjO1WRld_vcTQyJSwa0_3pxU9wycVNGQVeVZAZIM5afYW-zJqTUroWEhcyGTtU2eO2j-2Qbcnx5lLCel9iX-2eUpFUZ29PU1A5fdbz6e2cbkAjlZs67pzUqEzCbSjNAY3446TyW5e0Zqv8jRfDRrntMRRvpStEtN4qGpnegtJirXQPl5dBIpto81I4OWZDPxovrzb-POas2KHQc0U7-d_mB7Lz1M12YOJeu_Qj5Atz1SGx5s13NkII1t3azuv3',
+  avatarUrl: travelerAvatar,
   facebookUrl: 'https://facebook.com',
   instagramUrl: 'https://instagram.com',
   notionUrl: 'https://notion.so',

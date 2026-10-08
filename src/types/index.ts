@@ -4,7 +4,7 @@ export type ScreenType = 'world-map' | 'japan-map' | 'places' | 'memories';
 
 export type CountryId = 'JP' | 'VN';
 
-export type PrefectureStatus = 'visited' | 'wishlist' | 'unvisited';
+export type PrefectureStatus = 'visited' | 'dream' | 'not_visited';
 
 export interface Prefecture {
   id: string;
@@ -27,7 +27,7 @@ export interface Region {
   visitedPrefectures: number;
   memoryCount: number;
   wishlistCount: number;
-  status: 'visited' | 'wishlist' | 'unvisited';
+  status: 'visited' | 'dream' | 'not_visited';
   color: string;
   pinPosition: { x: number; y: number }; // percentage coordinates
   prefectureIds: string[];
@@ -42,6 +42,7 @@ export interface Memory {
   titleJa: string;
   countryId: CountryId;
   regionId: string;
+  provinceId?: string;
   locationName: string;
   specificSpot?: string;
   date: string;
@@ -87,6 +88,7 @@ export interface Place {
 
 export interface ProfileData {
   authorName: string;
+  authorNameJa?: string;
   travelerTitle: string;
   travelerTitleJa: string;
   quoteVi: string;

@@ -2,6 +2,7 @@ import React from 'react';
 import { Language, ProfileData } from '../types';
 import { getT } from '../utils/translations';
 import { X, Award, MapPin, BookOpen, Compass, Sparkles, Settings, Lock, LogOut } from 'lucide-react';
+import travelerAvatar from '../assets/traveler-avatar.png';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -57,7 +58,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div className="relative mb-2">
             <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-white shadow-md ring-2 ring-[#9e3c26]/30">
               <img
-                src={profile.avatarUrl}
+                src={profile.avatarUrl || travelerAvatar}
+                onError={(event) => { if (!event.currentTarget.src.endsWith(travelerAvatar)) event.currentTarget.src = travelerAvatar; }}
                 alt="Traveler avatar"
                 className="w-full h-full object-cover"
               />
@@ -68,7 +70,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <h2 className="font-bold text-[18px] text-[#1c1c17]">
-            {profile.authorName}
+            {lang === 'VI' ? profile.authorName : (profile.authorNameJa || profile.authorName)}
           </h2>
           <p className="text-[12px] text-[#9e3c26] font-bold mt-0.5">
             {lang === 'VI' ? profile.travelerTitle : profile.travelerTitleJa}

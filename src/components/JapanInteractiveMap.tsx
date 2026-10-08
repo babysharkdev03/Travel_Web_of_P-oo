@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Region, Language } from '../types';
 import { Plus, Minus, RotateCcw, Sparkles, ChevronRight } from 'lucide-react';
+import { useMapGestures } from '../utils/useMapGestures';
 
 interface JapanInteractiveMapProps {
   regions: Region[];
   selectedRegion: Region | null;
   onSelectRegion: (region: Region) => void;
-  filterMode?: 'all' | 'visited' | 'wishlist';
+  filterMode?: 'all' | 'visited' | 'dream';
   lang: Language;
 }
 
@@ -17,7 +18,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
   filterMode = 'all',
   lang,
 }) => {
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const { zoomLevel, setZoomLevel, pan, reset, gestures } = useMapGestures();
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
 
   const handleRegionClick = (regionId: string) => {
@@ -25,9 +26,9 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
     if (reg) onSelectRegion(reg);
   };
 
-  const isRegionDimmed = (status: 'visited' | 'wishlist' | 'unvisited') => {
+  const isRegionDimmed = (status: 'visited' | 'dream' | 'not_visited') => {
     if (filterMode === 'visited' && status !== 'visited') return true;
-    if (filterMode === 'wishlist' && status !== 'wishlist') return true;
+    if (filterMode === 'dream' && status !== 'dream') return true;
     return false;
   };
 
@@ -116,14 +117,14 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
   ];
 
   return (
-    <div className="relative w-full h-[480px] rounded-3xl overflow-hidden bg-[#faf7f2] border border-[#ddc0ba]/60 shadow-[0_10px_28px_rgba(88,71,56,0.1)] select-none">
+    <div {...gestures} style={{ touchAction: 'none' }} className="relative w-full h-[480px] rounded-3xl overflow-hidden bg-[#faf7f2] border border-[#ddc0ba]/60 shadow-[0_10px_28px_rgba(88,71,56,0.1)] select-none">
       {/* Texture background */}
       <div className="absolute inset-0 bg-[#fbf9f5] pointer-events-none" />
 
       {/* Zoomable Container */}
       <div
         className="w-full h-full relative transition-transform duration-300 ease-out origin-center"
-        style={{ transform: `scale(${zoomLevel})` }}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})` }}
       >
         <svg
           viewBox="0 0 600 520"
@@ -246,7 +247,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                 ? 'url(#jpHoverShadow)'
                 : 'url(#jp3dShadow)'
             }
-            opacity={isRegionDimmed(regions.find((r) => r.id === 'hokkaido')?.status || 'wishlist') ? 0.35 : 1}
+            opacity={isRegionDimmed(regions.find((r) => r.id === 'hokkaido')?.status || 'dream') ? 0.35 : 1}
           >
             <path
               d="M 390 120 
@@ -274,7 +275,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                 ? 'url(#jpHoverShadow)'
                 : 'url(#jp3dShadow)'
             }
-            opacity={isRegionDimmed(regions.find((r) => r.id === 'tohoku')?.status || 'wishlist') ? 0.35 : 1}
+            opacity={isRegionDimmed(regions.find((r) => r.id === 'tohoku')?.status || 'dream') ? 0.35 : 1}
           >
             <path
               d="M 405 155
@@ -387,7 +388,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                 ? 'url(#jpHoverShadow)'
                 : 'url(#jp3dShadow)'
             }
-            opacity={isRegionDimmed(regions.find((r) => r.id === 'chugoku')?.status || 'wishlist') ? 0.35 : 1}
+            opacity={isRegionDimmed(regions.find((r) => r.id === 'chugoku')?.status || 'dream') ? 0.35 : 1}
           >
             <path
               d="M 195 285
@@ -413,7 +414,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                 ? 'url(#jpHoverShadow)'
                 : 'url(#jp3dShadow)'
             }
-            opacity={isRegionDimmed(regions.find((r) => r.id === 'shikoku')?.status || 'wishlist') ? 0.35 : 1}
+            opacity={isRegionDimmed(regions.find((r) => r.id === 'shikoku')?.status || 'dream') ? 0.35 : 1}
           >
             <path
               d="M 215 355
@@ -439,7 +440,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                 ? 'url(#jpHoverShadow)'
                 : 'url(#jp3dShadow)'
             }
-            opacity={isRegionDimmed(regions.find((r) => r.id === 'kyushu')?.status || 'wishlist') ? 0.35 : 1}
+            opacity={isRegionDimmed(regions.find((r) => r.id === 'kyushu')?.status || 'dream') ? 0.35 : 1}
           >
             <path
               d="M 160 335
@@ -462,11 +463,16 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
         {japanBadges.map((badge) => {
           const isSelected = selectedRegion?.id === badge.id;
           const isHovered = hoveredRegion === badge.id;
+          const memoryCount = regions.find((region) => region.id === badge.id)?.memoryCount || 0;
 
           return (
             <div
               key={badge.id}
+              role="button"
+              tabIndex={0}
+              aria-label={lang === 'VI' ? `Chọn vùng ${badge.name}` : `${badge.nameJa}を選択`}
               onClick={() => handleRegionClick(badge.id)}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleRegionClick(badge.id); } }}
               onMouseEnter={() => setHoveredRegion(badge.id)}
               onMouseLeave={() => setHoveredRegion(null)}
               style={{ top: badge.top, left: badge.left }}
@@ -493,7 +499,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                   {lang === 'VI' ? badge.name : badge.nameJa}
                 </span>
 
-                {badge.memories > 0 && (
+                {memoryCount > 0 && (
                   <span
                     className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold font-mono ml-0.5 ${
                       isSelected
@@ -501,7 +507,7 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
                         : 'bg-[#f7f3eb] text-[#9e3c26]'
                     }`}
                   >
-                    {badge.memories}
+                    {memoryCount}
                   </span>
                 )}
 
@@ -519,12 +525,12 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
       </div>
 
       {/* Floating Zoom & Reset Controls */}
-      <div className="absolute right-3 bottom-3 z-30 flex flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-2xl shadow-md border border-[#ddc0ba]/50">
+      <div className="hidden sm:flex absolute right-3 bottom-3 z-30 flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-2xl shadow-md border border-[#ddc0ba]/50">
         <button
           type="button"
           onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 2.0))}
           className="w-7 h-7 rounded-xl flex items-center justify-center text-[#57423d] hover:text-[#9e3c26] hover:bg-[#f7f3eb] active:scale-90 transition-all cursor-pointer"
-          title="Phóng to bản đồ"
+          title={lang === 'VI' ? 'Phóng to bản đồ' : '地図を拡大'}
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
@@ -533,16 +539,16 @@ export const JapanInteractiveMap: React.FC<JapanInteractiveMapProps> = ({
           type="button"
           onClick={() => setZoomLevel((z) => Math.max(z - 0.2, 0.9))}
           className="w-7 h-7 rounded-xl flex items-center justify-center text-[#57423d] hover:text-[#9e3c26] hover:bg-[#f7f3eb] active:scale-90 transition-all cursor-pointer"
-          title="Thu nhỏ bản đồ"
+          title={lang === 'VI' ? 'Thu nhỏ bản đồ' : '地図を縮小'}
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
         <div className="w-4 h-[1px] bg-[#ddc0ba]/40 mx-auto" />
         <button
           type="button"
-          onClick={() => setZoomLevel(1)}
+          onClick={reset}
           className="w-7 h-7 rounded-xl flex items-center justify-center text-[#9e3c26] hover:bg-[#ffdad2]/50 active:scale-90 transition-all cursor-pointer"
-          title="Đặt lại góc nhìn"
+          title={lang === 'VI' ? 'Đặt lại góc nhìn' : '表示をリセット'}
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>

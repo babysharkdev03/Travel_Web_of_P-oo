@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import travelerAvatar from '../assets/traveler-avatar.png';
 import { Memory, Prefecture, ProfileData, CountryId, Language, Region, PrefectureStatus } from '../types';
 import {
   X,
@@ -29,6 +30,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { locationHierarchyData } from '../data/locationHierarchy';
+import { memoryProvinceId, resolveProvinceId } from '../utils/memoryLocations';
 import { japanRegions, allJapanPrefectures, vietnamRegions, allVietnamProvinces } from '../data/regionsData';
 import { NotionJournalEditor } from './NotionJournalEditor';
 
@@ -225,7 +227,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFormIcon(m.icon || '🌸');
     setFormCountry(m.countryId);
     setFormRegionId(m.regionId || (m.countryId === 'JP' ? 'kanto' : 'trung-bo'));
-    setFormLocationId(m.locationName ? m.locationName.split(',')[0].toLowerCase().trim() : 'tokyo');
+    setFormLocationId(memoryProvinceId(m) || 'tokyo');
     setFormSpecificSpot(m.specificSpot || '');
     setFormDate(m.date || '2026-10-01');
     setFormWeather(m.weather || 'sunny');
@@ -260,6 +262,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         titleJa: formTitleJa || formTitle,
         countryId: formCountry,
         regionId: formRegionId,
+        provinceId: resolveProvinceId(formCountry, `${fullLocationDisplay} ${formSpecificSpot}`, formLocationId),
         locationName: fullLocationDisplay,
         specificSpot: formSpecificSpot.trim(),
         date: formDate,
@@ -284,6 +287,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         titleJa: formTitleJa || formTitle,
         countryId: formCountry,
         regionId: formRegionId,
+        provinceId: resolveProvinceId(formCountry, `${fullLocationDisplay} ${formSpecificSpot}`, formLocationId),
         locationName: fullLocationDisplay,
         specificSpot: formSpecificSpot.trim(),
         date: formDate,
@@ -402,6 +406,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       titleJa: country === 'JP' ? `Notionより同期 • ${extractedTitle}` : `${extractedTitle} (ベトナム)`,
       countryId: country,
       regionId,
+      provinceId: resolveProvinceId(country, `${locationName} ${spot}`),
       locationName,
       specificSpot: spot,
       date: new Date().toISOString().split('T')[0],
@@ -411,7 +416,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       image: imagePresets[0].url,
       imageAlt: extractedTitle,
       layoutStyle: 'notion-magazine',
-      quote: `Trang nhật ký được đồng bộ tự động từ Notion cá nhân của tác giả Thu Pham.`,
+      quote: `Trang nhật ký được đồng bộ tự động từ Notion cá nhân của tác giả ${profile.authorName}.`,
       tag: country === 'JP' ? '#Notion #Tokyo #Japan' : '#Notion #Vietnam #TravelJournal',
       postcardsCount: 4,
       memoryCount: 1,
@@ -452,7 +457,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
   // UC2: PREFECTURES & REGIONS ACCORDION STATE
   // -------------------------------------------------------------
   const [prefectureCountryTab, setPrefectureCountryTab] = useState<CountryId>('JP');
-  const [prefectureStatusFilter, setPrefectureStatusFilter] = useState<'all' | 'visited' | 'wishlist' | 'unvisited'>('all');
+  const [prefectureStatusFilter, setPrefectureStatusFilter] = useState<'all' | 'visited' | 'dream' | 'not_visited'>('all');
   const [searchPrefectureText, setSearchPrefectureText] = useState('');
 
   // Accordion open/close state for regions (defaults open for first 3)
@@ -496,17 +501,18 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
   }, [currentProvinces, searchPrefectureText, prefectureStatusFilter]);
 
   const visitedCountJP = prefectures.filter((p) => p.status === 'visited').length;
-  const wishlistCountJP = prefectures.filter((p) => p.status === 'wishlist').length;
-  const unvisitedCountJP = prefectures.filter((p) => p.status === 'unvisited').length;
+  const wishlistCountJP = prefectures.filter((p) => p.status === 'dream').length;
+  const unvisitedCountJP = prefectures.filter((p) => p.status === 'not_visited').length;
 
   const visitedCountVN = vietnamProvincesList.filter((p) => p.status === 'visited').length;
-  const wishlistCountVN = vietnamProvincesList.filter((p) => p.status === 'wishlist').length;
-  const unvisitedCountVN = vietnamProvincesList.filter((p) => p.status === 'unvisited').length;
+  const wishlistCountVN = vietnamProvincesList.filter((p) => p.status === 'dream').length;
+  const unvisitedCountVN = vietnamProvincesList.filter((p) => p.status === 'not_visited').length;
 
   // -------------------------------------------------------------
   // UC3: PROFILE & SOCIAL BIO STATE
   // -------------------------------------------------------------
   const [profileName, setProfileName] = useState(profile.authorName);
+  const [profileNameJa, setProfileNameJa] = useState(profile.authorNameJa || '');
   const [profileTitle, setProfileTitle] = useState(profile.travelerTitle);
   const [profileTitleJa, setProfileTitleJa] = useState(profile.travelerTitleJa);
   const [profileQuoteVi, setProfileQuoteVi] = useState(profile.quoteVi);
@@ -526,6 +532,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
 
     const updatedProfile: ProfileData = {
       authorName: profileName.trim(),
+      authorNameJa: profileNameJa.trim(),
       travelerTitle: profileTitle.trim(),
       travelerTitleJa: profileTitleJa.trim(),
       quoteVi: profileQuoteVi.trim(),
@@ -1428,9 +1435,9 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPrefectureStatusFilter('wishlist')}
+                      onClick={() => setPrefectureStatusFilter('dream')}
                       className={`px-3 py-1.5 rounded-xl text-[12px] font-bold flex items-center gap-1 transition-all ${
-                        prefectureStatusFilter === 'wishlist'
+                        prefectureStatusFilter === 'dream'
                           ? 'bg-[#d48344] text-white shadow-xs'
                           : 'bg-[#f7f3eb] text-[#d48344] hover:bg-[#ece8e0]'
                       }`}
@@ -1440,9 +1447,9 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPrefectureStatusFilter('unvisited')}
+                      onClick={() => setPrefectureStatusFilter('not_visited')}
                       className={`px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all ${
-                        prefectureStatusFilter === 'unvisited'
+                        prefectureStatusFilter === 'not_visited'
                           ? 'bg-[#8a726c] text-white shadow-xs'
                           : 'bg-[#f7f3eb] text-[#8a726c] hover:bg-[#ece8e0]'
                       }`}
@@ -1544,8 +1551,8 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                         <div className="p-3 divide-y divide-[#ddc0ba]/20 flex flex-col gap-2">
                           {regionPrefectures.map((pref) => {
                             const isVisited = pref.status === 'visited';
-                            const isWishlist = pref.status === 'wishlist';
-                            const isUnvisited = pref.status === 'unvisited';
+                            const isWishlist = pref.status === 'dream';
+                            const isUnvisited = pref.status === 'not_visited';
 
                             return (
                               <div
@@ -1595,9 +1602,9 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                                     type="button"
                                     onClick={() => {
                                       if (prefectureCountryTab === 'JP') {
-                                        onUpdatePrefectureStatus(pref.id, 'wishlist');
+                                        onUpdatePrefectureStatus(pref.id, 'dream');
                                       } else if (onUpdateVietnamProvinceStatus) {
-                                        onUpdateVietnamProvinceStatus(pref.id, 'wishlist');
+                                        onUpdateVietnamProvinceStatus(pref.id, 'dream');
                                       }
                                       showToast(`⭐ Đã đổi "${pref.name}" sang: Ước mơ`);
                                     }}
@@ -1616,9 +1623,9 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                                     type="button"
                                     onClick={() => {
                                       if (prefectureCountryTab === 'JP') {
-                                        onUpdatePrefectureStatus(pref.id, 'unvisited');
+                                        onUpdatePrefectureStatus(pref.id, 'not_visited');
                                       } else if (onUpdateVietnamProvinceStatus) {
-                                        onUpdateVietnamProvinceStatus(pref.id, 'unvisited');
+                                        onUpdateVietnamProvinceStatus(pref.id, 'not_visited');
                                       }
                                       showToast(`⚪ Đã đổi "${pref.name}" sang: Chưa đi`);
                                     }}
@@ -1664,6 +1671,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                   <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#9e3c26] shadow-sm mb-1">
                     <img
                       src={profileAvatar || profile.avatarUrl}
+                      onError={(event) => { if (!event.currentTarget.src.endsWith(travelerAvatar)) event.currentTarget.src = travelerAvatar; }}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                     />
@@ -1681,7 +1689,20 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                       required
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
-                      placeholder="VD: Thu Pham (phamthuhp031103)"
+                      placeholder="Phạm Thanh Thư"
+                      className="w-full h-10 px-3 rounded-xl bg-white border border-[#ddc0ba]/40 text-[13px] font-bold text-[#1c1c17] focus:outline-none focus:border-[#9e3c26]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#57423d] uppercase mb-1">
+                      Họ và tên tiếng Nhật
+                    </label>
+                    <input
+                      type="text"
+                      value={profileNameJa}
+                      onChange={(e) => setProfileNameJa(e.target.value)}
+                      placeholder="ファム　タイン　トゥー"
                       className="w-full h-10 px-3 rounded-xl bg-white border border-[#ddc0ba]/40 text-[13px] font-bold text-[#1c1c17] focus:outline-none focus:border-[#9e3c26]"
                     />
                   </div>
@@ -1691,7 +1712,7 @@ Buổi sớm mai khi dạo bước qua từng con ngõ nhỏ, không khí thanh 
                       URL Ảnh Avatar
                     </label>
                     <input
-                      type="url"
+                      type="text"
                       value={profileAvatar}
                       onChange={(e) => setProfileAvatar(e.target.value)}
                       placeholder="https://..."
